@@ -34,7 +34,6 @@ The data processing pipeline includes:
     ```bash
     python gordon.py
     ```
-ctly learns to rank pairs of hypotheses based on RCR.
 
 ## Embeddings
 
