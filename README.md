@@ -20,20 +20,6 @@ The data processing pipeline includes:
 
 ## Usage
 
-### Generating Embeddings:
-
-*   **BioBERT Embeddings:** Run `biobert_embeddings.py` to generate BioBERT embeddings for your dataset.
-    ```bash
-    python biobert_embeddings.py
-    ```
-    Output embeddings will be saved in pickle files (e.g., `biobert_embeddings_hypothesis.pkl`, `biobert_embeddings_background.pkl`).
-
-*   **Llama Embeddings:** Run `llama_embeddings.py` to generate Llama embeddings.
-    ```bash
-    python llama_embeddings.py
-    ```
-    Output embeddings will be saved in pickle files (e.g., `llama_embeddings_hypothesis.pkl`, `llama_embeddings_background.pkl`).
-
 ### Training Models:
 
 *   ** Run `gordon_training.py` to train the two-stage scoring model, including hyperparameter tuning using Optuna.
@@ -42,7 +28,7 @@ The data processing pipeline includes:
     ```
     Trained model weights for Stage 1 and Stage 2 will be saved as `.pth` files (e.g., `gordonramsay_stage1_BioBERT.pth`, `gordonramsay_stage2_BioBERT.pth`).
 
-### Using the RCR Prediction Tool:
+### Using the Gordon Prediction Tool:
 
 *   **Run `gordon.py`:** This script loads the trained two-stage scoring model (Llama or BioBERT, depending on configuration) and prompts you to enter hypothesis and background text. It then outputs the predicted RCR score.
     ```bash
