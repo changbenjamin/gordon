@@ -149,3 +149,14 @@ if __name__ == '__main__':
         predicted_rcr_score = get_rcr_for_hypothesis_background(hypothesis_text, background_text, stage1_model, stage2_model, tokenizer, model, device)
 
         print(f"Predicted RCR: {predicted_rcr_score:.10f}")
+        
+        if (predicted_rcr_score > 1):
+            print("Fantastic hypothesis! You've outdone even Gordon!")
+        elif (predicted_rcr_score > 0.7):
+            print("Great hypothesis! You've made Gordon proud.")
+        elif (predicted_rcr_score > 0.5):
+            print("Great idea! You've got a lot to achieve!")
+        elif (predicted_rcr_score > 0.3):
+            print("Good hypothesis!")
+        elif (predicted_rcr_score == 0.0):
+            print("This hypothesis is so raw, it's still finding Nemo!")
