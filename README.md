@@ -1,8 +1,8 @@
-# GordonRamsay Hypothesis Evaluation Model
+# Gordon: Towards Automating Scientific Taste
 
 ## Overview
 
-This repository contains code for a machine learning project aimed at evaluating the "goodness" of scientific hypotheses. The project utilizes two-stage neural networks to predict the quality of scientific hypotheses based on paper abstracts from bioRxiv and medRxiv.
+This repository contains code for a machine learning project aimed at evaluating the quality of scientific hypotheses. The project utilizes two-stage neural networks to predict the quality of scientific hypotheses based on paper abstracts from bioRxiv and medRxiv.
 
 ## Data
 
