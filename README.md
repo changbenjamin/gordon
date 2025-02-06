@@ -22,7 +22,7 @@ The data processing pipeline includes:
 
 ### Training Models:
 
-*   ** Run `gordon_training.py` to train the two-stage scoring model, including hyperparameter tuning using Optuna.
+*   **Run `gordon_training.py`** to train the two-stage scoring model, including hyperparameter tuning using Optuna.
     ```bash
     python gordon_training.py
     ```
