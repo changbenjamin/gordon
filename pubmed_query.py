@@ -6,7 +6,7 @@ from aiolimiter import AsyncLimiter
 from tqdm import tqdm
 
 # API Key (Replace with your actual key)
-API_KEY = "309f14f8a79a4cb31832fe44e6f991fcaa09"
+API_KEY = insert_api_key_here
 
 # API Base URL
 API_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
