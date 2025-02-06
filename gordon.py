@@ -140,23 +140,22 @@ if __name__ == '__main__':
     stage2_model.eval()
     print("Loaded Stage 1 and Stage 2 models with saved weights.")
     
-    for i in range(10):
-        # --- Get Hypothesis and Background Text Input ---
-        hypothesis_text = input("Enter hypothesis text: ")
-        background_text = input("Enter background text: ")
+    # --- Get Hypothesis and Background Text Input ---
+    hypothesis_text = input("Enter hypothesis text: ")
+    background_text = input("Enter background text: ")
 
-        # --- Predict RCR for Input Hypothesis and Background ---
-        predicted_rcr_score = get_rcr_for_hypothesis_background(hypothesis_text, background_text, stage1_model, stage2_model, tokenizer, model, device)
+    # --- Predict RCR for Input Hypothesis and Background ---
+    predicted_rcr_score = get_rcr_for_hypothesis_background(hypothesis_text, background_text, stage1_model, stage2_model, tokenizer, model, device)
 
-        print(f"Predicted RCR: {predicted_rcr_score:.10f}")
-        
-        if (predicted_rcr_score > 1):
-            print("Fantastic hypothesis! You've outdone even Gordon!")
-        elif (predicted_rcr_score > 0.7):
-            print("Great hypothesis! You've made Gordon proud.")
-        elif (predicted_rcr_score > 0.5):
-            print("Great idea! You've got a lot to achieve!")
-        elif (predicted_rcr_score > 0.3):
-            print("Good hypothesis!")
-        elif (predicted_rcr_score == 0.0):
-            print("This hypothesis is so raw, it's still finding Nemo!")
+    print(f"Predicted RCR: {predicted_rcr_score:.10f}")
+
+    if (predicted_rcr_score > 1):
+        print("Fantastic hypothesis! You've outdone even Gordon!")
+    elif (predicted_rcr_score > 0.7):
+        print("Great hypothesis! You've made Gordon proud.")
+    elif (predicted_rcr_score > 0.5):
+        print("Great idea! You've got a lot to achieve!")
+    elif (predicted_rcr_score > 0.3):
+        print("Good hypothesis!")
+    elif (predicted_rcr_score == 0.0):
+        print("This hypothesis is so raw, it's still finding Nemo!")
