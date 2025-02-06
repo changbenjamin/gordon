@@ -5,3 +5,5 @@
 *.pth
 *.pkl
 *.png
+*token
+*stored_tokens
