@@ -9,7 +9,7 @@ from sklearn.metrics import f1_score, roc_auc_score, mean_squared_error, accurac
 import numpy as np
 import optuna # Import Optuna
 
-test_proportion = 0.3
+test_proportion = 0.1
 
 ### LLAMA EMBEDDINGS
 embedding_dim = 4096
