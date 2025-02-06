@@ -1,0 +1,204 @@
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader # Only need DataLoader for test set
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+import pickle
+import time
+
+# ### LLAMA EMBEDDINGS
+# embedding_dim = 1024
+# background_pkl = 'llama_background_train.pkl'
+# hypothesis_pkl = 'llama_hypothesis_train.pkl'
+# model_embeddings = "llama"
+
+
+### BIOBERT EMBEDDINGS
+embedding_dim = 1024
+background_pkl = 'biobert_background_train.pkl'
+hypothesis_pkl = 'biobert_hypothesis_train.pkl'
+model_embeddings = "BioBERT"
+
+
+# ### RANDOM EMBEDDINGS
+# embedding_dim = 1024
+# background_pkl = 'random_background_train.pkl'
+# hypothesis_pkl = 'random_hypothesis_train.pkl'
+# model_embeddings = "random"
+
+
+
+# --- 1. Data Loading and Preprocessing (Reusing from scoring model) ---
+def load_embeddings(embeddings_file):
+    with open(embeddings_file, 'rb') as f:
+        embeddings_dict = pickle.load(f)
+    return embeddings_dict
+
+def load_rcr_data(rcr_file):
+    rcr_df = pd.read_csv(rcr_file)
+    return rcr_df
+
+def prepare_data(background_embeddings_file, hypothesis_embeddings_file, rcr_file):
+    background_embeddings = load_embeddings(background_embeddings_file)
+    hypothesis_embeddings = load_embeddings(hypothesis_embeddings_file)
+    rcr_df = load_rcr_data(rcr_file)
+
+    data = []
+    for index, row in rcr_df.iterrows():
+        pmid = int(row['PMID'])
+        rcr = row['relative_citation_ratio']
+        if pmid in background_embeddings and pmid in hypothesis_embeddings:
+            background_embedding = background_embeddings[pmid]
+            hypothesis_embedding = hypothesis_embeddings[pmid]
+            data.append({'pmid': pmid,
+                         'background_embedding': background_embedding,
+                         'hypothesis_embedding': hypothesis_embedding,
+                         'rcr': rcr})
+    return pd.DataFrame(data)
+
+def create_labels(df):
+    df['is_zero_rcr'] = (df['rcr'] == 0).astype(int)
+    return df
+
+# --- 2. Model Definitions (Reusing Stage1Classifier and Stage2Regressor from scoring model) ---
+class Stage1Classifier(nn.Module):
+    def __init__(self, input_size, hidden_size=239, dropout_rate=0.5):
+        super(Stage1Classifier, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.relu = nn.ReLU()
+        self.dropout1 = nn.Dropout(dropout_rate)
+        self.fc2 = nn.Linear(hidden_size, 1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        out = self.fc1(x)
+        out = self.relu(out)
+        out = self.dropout1(out)
+        out = self.fc2(out)
+        out = self.sigmoid(out)
+        return out
+
+class Stage2Regressor(nn.Module):
+    def __init__(self, input_size, hidden_size=64, dropout_rate=0.5):
+        super(Stage2Regressor, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.relu = nn.ReLU()
+        self.dropout1 = nn.Dropout(dropout_rate)
+        self.fc2 = nn.Linear(hidden_size, 1)
+
+    def forward(self, x):
+        out = self.fc1(x)
+        out = self.relu(out)
+        out = self.dropout1(out)
+        out = self.fc2(out)
+        return out
+
+# --- 3. Prediction Function using Two-Stage Scoring Model ---
+def predict_rcr_two_stage(stage1_model, stage2_model, hypothesis_embedding, background_embedding):
+    combined_embedding = torch.cat((torch.tensor(background_embedding).float(), torch.tensor(hypothesis_embedding).float()), dim=0).unsqueeze(0) # Prepare input
+
+    stage1_output = stage1_model(combined_embedding)
+    stage1_prediction_binary = (stage1_output > 0.5).int()
+
+    if stage1_prediction_binary.item() == 0: # Stage 1 predicts zero RCR
+        return 0.0
+    else: # Stage 1 predicts non-zero RCR, use Stage 2
+        stage2_output = stage2_model(combined_embedding)
+        return stage2_output.item() # Return predicted RCR value
+
+if __name__ == '__main__':
+    print(f"Evaluating Scoring Model as Ranking Model with {model_embeddings} Embeddings...")
+    # --- Load Data and Prepare Test Set ---
+    background_pkl = background_pkl
+    hypothesis_pkl = hypothesis_pkl
+    rcr_file = 'gordonramsay_data_processed.csv'
+
+    processed_df = prepare_data(background_pkl, hypothesis_pkl, rcr_file)
+    processed_df = create_labels(processed_df)
+
+    train_val_stage1_df, overall_test_df = train_test_split(processed_df, test_size=0.1, random_state=42, stratify=processed_df['is_zero_rcr'])
+
+    # --- Prepare Test Pairs with RCR Difference > 0.5 from overall_test_df ---
+    test_ranking_pairs = []
+    rcr_threshold_eval = 1.0 # Threshold for RCR difference in test pairs
+
+    start_time_pairs = time.time() # Start timer for pair creation
+    pair_count = 0
+    papers_processed_count = 0 # Initialize a separate counter for papers processed # ADDED
+    total_papers_test = len(overall_test_df)
+    print("Starting test pair creation...")
+
+    for index_a, paper_a in overall_test_df.iterrows():
+        papers_processed_count += 1 # Increment paper counter here, outside inner loop # ADDED
+
+        for index_b, paper_b in overall_test_df.iterrows():
+            if index_a == index_b:
+                continue
+            rcr_diff = abs(paper_a['rcr'] - paper_b['rcr'])
+            if rcr_diff >= rcr_threshold_eval:
+                if paper_a['rcr'] > paper_b['rcr']:
+                    better_paper = paper_a
+                    worse_paper = paper_b
+                    label = 1 # Paper A is better - SWAPPED LABEL TO 1
+                else:
+                    better_paper = paper_b
+                    worse_paper = paper_a
+                    label = 0 # Paper B is better - SWAPPED LABEL TO 0
+                test_ranking_pairs.append({
+                    'paper_a': paper_a,
+                    'paper_b': paper_b,
+                    'ranking_label': label # Actual ranking label based on true RCR
+                })
+                pair_count += 1
+        if papers_processed_count % 10 == 0: # Use papers_processed_count in print statement # MODIFIED
+            elapsed_time = time.time() - start_time_pairs
+            print(f"Processed {papers_processed_count+1}/{total_papers_test} papers, {pair_count} pairs created so far... ({elapsed_time:.2f} seconds)")
+
+    test_ranking_pairs_df = pd.DataFrame(test_ranking_pairs) # DataFrame is created AFTER the loop
+    # --- ENSURE test_ranking_pairs_df IS ALWAYS DEFINED, EVEN IF EMPTY ---
+    if test_ranking_pairs_df.empty: # Check if DataFrame is empty (no pairs created)
+        print("Warning: No test ranking pairs were created with RCR difference >", rcr_threshold_eval) # Add a warning message
+
+    print(f"Number of test ranking pairs with RCR difference > {rcr_threshold_eval}: {len(test_ranking_pairs_df)}")
+
+    # --- Load Saved Stage 1 and Stage 2 Models ---
+    stage1_model = Stage1Classifier(embedding_dim * 2) # Instantiate models
+    stage2_model = Stage2Regressor(embedding_dim * 2)
+
+    stage1_model_path = f"gordonramsay_stage1_{model_embeddings}.pth" # Use model_embeddings variable
+    stage2_model_path = f"gordon_ramsay_stage2_{model_embeddings}.pth"
+
+    stage1_model.load_state_dict(torch.load(stage1_model_path)) # Load weights
+    stage2_model.load_state_dict(torch.load(stage2_model_path))
+    stage1_model.eval() # Set to evaluation mode
+    stage2_model.eval()
+
+
+    # --- Predict Rankings and Evaluate Pairwise Accuracy ---
+    correct_predictions = 0
+    total_pairs = len(test_ranking_pairs_df)
+
+    with torch.no_grad(): # Disable gradient calculation for inference
+        for index, pair_row in test_ranking_pairs_df.iterrows():
+            paper_a = pair_row['paper_a']
+            paper_b = pair_row['paper_b']
+            true_ranking_label = pair_row['ranking_label']
+
+            # Get predicted RCR scores from scoring model
+            predicted_rcr_a = predict_rcr_two_stage(stage1_model, stage2_model, paper_a['hypothesis_embedding'], paper_a['background_embedding'])
+            predicted_rcr_b = predict_rcr_two_stage(stage1_model, stage2_model, paper_b['hypothesis_embedding'], paper_b['background_embedding'])
+
+            # Predict ranking based on scoring model predictions
+            if predicted_rcr_a > predicted_rcr_b:
+                predicted_ranking_label = 0 # Model predicts Paper A better
+            else:
+                predicted_ranking_label = 1 # Model predicts Paper B better
+
+            if predicted_ranking_label == true_ranking_label:
+                correct_predictions += 1
+
+    pairwise_accuracy = correct_predictions / total_pairs
+    print(f"\nPairwise Accuracy of Scoring Model as Ranking Model (RCR diff > {rcr_threshold_eval}): {pairwise_accuracy:.6f}")
+
+    print("\n--- Scoring Model as Ranking Model Evaluation Complete ---")
