@@ -2,7 +2,6 @@
 !/*
 */
 *.csv
-*.pth
 *.pkl
 *.png
 *stored_tokens
