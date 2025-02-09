@@ -382,7 +382,7 @@ if __name__ == '__main__':
 
 
         # --- Save Stage 1 Model ---
-    stage1_model_path = f"gordonramsay_stage1_{model_embeddings}.pth"
+    stage1_model_path = f"gordon_stage1_{model_embeddings}.pth"
     torch.save(best_stage1_model.state_dict(), stage1_model_path)
     print(f"Stage 1 model saved to {stage1_model_path}")
 
@@ -434,7 +434,7 @@ if __name__ == '__main__':
 
 
     # --- Save Stage 2 Model ---
-    stage2_model_path = f"gordon_ramsay_stage2_{model_embeddings}.pth"
+    stage2_model_path = f"gordon_stage2_{model_embeddings}.pth"
     torch.save(best_stage2_model.state_dict(), stage2_model_path)
     print(f"Stage 2 model saved to {stage2_model_path}")
 

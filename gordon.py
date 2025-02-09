@@ -126,8 +126,8 @@ if __name__ == '__main__':
     stage2_model = Stage2Regressor(input_size)
 
     # --- Load Saved Stage 1 and Stage 2 Models ---
-    stage1_model_path = f"gordonramsay_stage1_{model_embeddings}.pth"
-    stage2_model_path = f"gordon_ramsay_stage2_{model_embeddings}.pth"
+    stage1_model_path = f"gordon_stage1_{model_embeddings}.pth"
+    stage2_model_path = f"gordon_stage2_{model_embeddings}.pth"
 
     stage1_model.load_state_dict(torch.load(stage1_model_path))
     stage2_model.load_state_dict(torch.load(stage2_model_path))

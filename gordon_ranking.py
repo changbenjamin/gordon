@@ -165,8 +165,8 @@ if __name__ == '__main__':
     stage1_model = Stage1Classifier(embedding_dim * 2)
     stage2_model = Stage2Regressor(embedding_dim * 2)
 
-    stage1_model_path = f"gordonramsay_stage1_{model_embeddings}.pth"
-    stage2_model_path = f"gordon_ramsay_stage2_{model_embeddings}.pth"
+    stage1_model_path = f"gordon_stage1_{model_embeddings}.pth"
+    stage2_model_path = f"gordon_stage2_{model_embeddings}.pth"
 
     stage1_model.load_state_dict(torch.load(stage1_model_path))
     stage2_model.load_state_dict(torch.load(stage2_model_path))
