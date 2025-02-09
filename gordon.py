@@ -31,7 +31,6 @@ import numpy as np
 
 
 
-
 ### UNCOMMENT FOR BIOBERT EMBEDDINGS
 
 model_name = "dmis-lab/biobert-large-cased-v1.1"
@@ -53,10 +52,11 @@ def get_embedding(text, tokenizer, model, device):
     return cls_embedding_tensor.cpu().numpy().flatten().tolist()
 
 
-
+# The classifier and regressor hidden sizes need to be defined based on the saved checkpoint
 
 classifier_hidden_size = 187
 regressor_hidden_size = 88
+
 
 class Stage1Classifier(nn.Module):
     def __init__(self, input_size, hidden_size=classifier_hidden_size, dropout_rate=0.5):
