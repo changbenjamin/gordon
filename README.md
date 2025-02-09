@@ -30,7 +30,7 @@ The data processing pipeline includes:
 
 ### Using the Gordon Prediction Tool:
 
-*   **Run `gordon.py`:** This script loads the trained two-stage scoring model (Llama or BioBERT, depending on configuration) and prompts you to enter hypothesis and background text. It then outputs the predicted RCR score.
+*   **Run `gordon.py`:** This script loads the trained two-stage scoring model (Llama or BioBERT, depending on configuration) and prompts you to enter two hypotheses and background texts. It then tells you how the two hypotheses compare with each other.
     ```bash
     python gordon.py
     ```
