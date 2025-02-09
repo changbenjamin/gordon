@@ -5,17 +5,14 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-# --- 1. Load Llama-3-8B Model and Tokenizer ---
-model_name = "meta-llama/Llama-3.1-8B-Instruct"  # Or "meta-llama/Llama-3-8B" if you prefer the base model
+model_name = "meta-llama/Llama-3.1-8B-Instruct"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-# --- FIX: Set padding token for Llama tokenizer ---
 tokenizer.pad_token = tokenizer.eos_token
-print(f"Padding token set to: {tokenizer.pad_token}") # Verification
+# print(f"Padding token set to: {tokenizer.pad_token}")
 
-model = AutoModelForCausalLM.from_pretrained(model_name) # Use AutoModelForCausalLM for decoder-only models like Llama
+model = AutoModelForCausalLM.from_pretrained(model_name)
 
-# Move model to GPU
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 model.to(device)
 model.eval()
@@ -38,37 +35,26 @@ def get_llama_embeddings_batched(texts, tokenizer, model, device):
         torch.Tensor: A tensor of average-pooled embeddings for the batch, moved to CPU.
                        Shape: [batch_size, hidden_size]
     """
-    # Tokenize the batch of texts, padding and truncation are handled automatically
     inputs = tokenizer(texts,
                        return_tensors="pt",
                        truncation=True,
                        padding=True,
-                       max_length=512) # Adjust max_length if needed for Llama
+                       max_length=512)
     inputs = inputs.to(device)
 
     with torch.no_grad():
-        outputs = model(**inputs, output_hidden_states=True) # Get hidden states
+        outputs = model(**inputs, output_hidden_states=True) 
 
-    # --- 2. Average Pooling for Llama Embeddings ---
-    # Get the last hidden state from the model's output
-    last_hidden_states = outputs.hidden_states[-1] # Access the hidden states from the last layer
+    last_hidden_states = outputs.hidden_states[-1] 
 
-    # Perform average pooling over the token dimension (dimension 1) to get sentence embeddings
     attention_mask = inputs['attention_mask']
-    input_lengths = attention_mask.sum(dim=1) # Get actual length of each sequence (ignoring padding)
+    input_lengths = attention_mask.sum(dim=1) 
 
-    # Sum the embeddings along the sequence dimension, considering the attention mask
     sum_embeddings = torch.sum(last_hidden_states * attention_mask.unsqueeze(-1), dim=1)
-
-    # Avoid division by zero for empty sequences (though unlikely with padding=True)
     average_pooled_embeddings = sum_embeddings / input_lengths.unsqueeze(-1)
+    return average_pooled_embeddings.cpu() 
 
-
-    return average_pooled_embeddings.cpu() # Move embeddings back to CPU
-
-
-# Batch size - adjust this based on your GPU memory. Start with 32 or 64 and increase if possible.
-batch_size = 4 # Reduce batch size for Llama-3-8B, it's more memory intensive
+batch_size = 4
 
 embedding_dict = {}
 num_batches = len(background) // batch_size + (1 if len(background) % batch_size != 0 else 0)
@@ -98,7 +84,7 @@ with tqdm(total=num_batches, desc="Generating Llama Embeddings (Batched)") as pb
 
 
         try:
-            batch_embeddings_tensor = get_llama_embeddings_batched(batch_texts, tokenizer, model, device) # Use the new function
+            batch_embeddings_tensor = get_llama_embeddings_batched(batch_texts, tokenizer, model, device)
             batch_embeddings_numpy = batch_embeddings_tensor.numpy()
 
             for j in range(len(batch_pmids)):
@@ -118,14 +104,12 @@ with tqdm(total=num_batches, desc="Generating Llama Embeddings (Batched)") as pb
 
         pbar.update(1)
 
-# Save the dictionary to a pickle file
-output_file = "llama3.1_embeddings_hypothesis.pkl" # Changed output file name
+output_file = "llama3.1_embeddings_hypothesis.pkl"
 with open(output_file, 'wb') as f:
     pickle.dump(embedding_dict, f)
 
 print(f"Batched Llama embeddings saved to {output_file}")
 
-# --- Code to load the embeddings later ---
 loaded_embedding_dict = {}
 with open(output_file, 'rb') as f:
     loaded_embedding_dict = pickle.load(f)

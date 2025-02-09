@@ -5,13 +5,12 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-# Load model and tokenizer directly
+# Load BioBert model
 model_name = "dmis-lab/biobert-large-cased-v1.1"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModel.from_pretrained(model_name)
 
-# Move model to GPU
-device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu") # Use GPU if available, otherwise CPU
+device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 model.to(device)
 model.eval()
 
@@ -35,21 +34,17 @@ def get_cls_embeddings_batched(texts, tokenizer, model, device):
         torch.Tensor: A tensor of CLS embeddings for the batch, moved to CPU.
                        Shape: [batch_size, hidden_size]
     """
-    # Tokenize the batch of texts, padding and truncation are handled automatically
-    # Explicitly set max_length and truncation strategy
     inputs = tokenizer(texts,
                        return_tensors="pt",
                        truncation=True,
                        padding=True,
-                       max_length=512) # Explicitly set max_length to 512
+                       max_length=512) # Need to set max length
     inputs = inputs.to(device)
 
-    # Check for any input_ids that are still longer than 512 (for debugging)
     for input_ids_example in inputs['input_ids']:
         if len(input_ids_example) > 512:
             print("WARNING: Input sequence is still longer than 512 after tokenization and truncation!")
             print(f"Length: {len(input_ids_example)}")
-
 
     # Get model outputs
     with torch.no_grad():
@@ -58,19 +53,18 @@ def get_cls_embeddings_batched(texts, tokenizer, model, device):
     # CLS embeddings for the entire batch
     cls_embeddings = outputs.last_hidden_state[:, 0, :]  # Shape: [batch_size, hidden_size]
 
-    return cls_embeddings.cpu() # Move embeddings back to CPU
+    return cls_embeddings.cpu() # Move embeddings back to CPU... recommended by ChatGPT but could remove
 
 
-# Batch size - adjust this based on your GPU memory. Start with 32 or 64 and increase if possible.
 batch_size = 32
 
 embedding_dict = {}
-num_batches = len(background) // batch_size + (1 if len(background) % batch_size != 0 else 0) # Calculate number of batches for tqdm
+num_batches = len(background) // batch_size + (1 if len(background) % batch_size != 0 else 0)
 
 with tqdm(total=num_batches, desc="Generating Embeddings (Batched)") as pbar:
     for i in range(0, len(background), batch_size):
         batch_texts = background[i:i + batch_size]
-        batch_pmids = pmids[i:i + batch_size] # Get corresponding PMIDs for the batch
+        batch_pmids = pmids[i:i + batch_size]
 
         # --- Automated Verification: Check Alignment for the First Batch ---
         if i == 0: # Perform verification only for the first batch
@@ -128,7 +122,7 @@ with open(output_file, 'rb') as f:
     loaded_embedding_dict = pickle.load(f)
 
 print(f"Number of embeddings loaded: {len(loaded_embedding_dict)}")
-example_pmid = pmids[0] # Example PMID to retrieve
+example_pmid = pmids[0]
 loaded_embedding = loaded_embedding_dict[example_pmid]
 print(f"Shape of loaded embedding for {example_pmid}: {loaded_embedding.shape}")
 print(f"Type of loaded embedding: {type(loaded_embedding)}")

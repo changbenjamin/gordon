@@ -5,9 +5,11 @@ from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 import pickle
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import f1_score, roc_auc_score, mean_squared_error, accuracy_score # Import accuracy_score
+from sklearn.metrics import f1_score, roc_auc_score, mean_squared_error, accuracy_score
 import numpy as np
-import optuna # Import Optuna
+import optuna
+
+# Choose your embedding below:
 
 test_proportion = 0.1
 
@@ -33,7 +35,6 @@ model_embeddings = "llama"
 
 
 # --- 1. Data Loading and Preprocessing ---
-# ... (Data loading and preprocessing functions remain the same) ...
 def load_embeddings(embeddings_file):
     with open(embeddings_file, 'rb') as f:
         embeddings_dict = pickle.load(f)
@@ -88,7 +89,6 @@ class RCRDataset(Dataset):
             raise ValueError("Invalid stage specified for dataset.")
 
 # --- 2. Define Models ---
-# ... (Stage1Classifier and Stage2Regressor classes remain the same) ...
 class Stage1Classifier(nn.Module):
     def __init__(self, input_size, hidden_size=128, dropout_rate=0.5):
         super(Stage1Classifier, self).__init__()
@@ -123,13 +123,13 @@ class Stage2Regressor(nn.Module):
 
 # --- 3. Training and Evaluation Functions ---
 
-def train_stage1(model, train_loader, val_loader, epochs=10, learning_rate=0.001, class_weights=None, weight_decay=1e-5, dropout_rate=0.5, patience=3): # Added patience
+def train_stage1(model, train_loader, val_loader, epochs=10, learning_rate=0.001, class_weights=None, weight_decay=1e-5, dropout_rate=0.5, patience=3):
     criterion = nn.BCELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
-    best_val_f1 = -np.inf # Initialize best val metric to negative infinity for F1 (higher is better)
+    best_val_f1 = -np.inf
     epochs_no_improve = 0
-    best_model_state = None # To store the best model weights
+    best_model_state = None
 
     for epoch in range(epochs):
         model.train()
@@ -145,21 +145,21 @@ def train_stage1(model, train_loader, val_loader, epochs=10, learning_rate=0.001
             optimizer.step()
             train_loss += loss.item()
 
-        val_loss, val_f1, val_auc, val_accuracy = evaluate_stage1(model, val_loader, output_csv=None) # Get accuracy
-        print(f"Epoch {epoch+1}/{epochs}, Train Loss: {train_loss/len(train_loader):.4f}, Val Loss: {val_loss:.4f}, Val F1: {val_f1:.4f}, Val AUC: {val_auc:.4f}, Val Accuracy: {val_accuracy:.4f}") # Print accuracy
+        val_loss, val_f1, val_auc, val_accuracy = evaluate_stage1(model, val_loader, output_csv=None)
+        print(f"Epoch {epoch+1}/{epochs}, Train Loss: {train_loss/len(train_loader):.4f}, Val Loss: {val_loss:.4f}, Val F1: {val_f1:.4f}, Val AUC: {val_auc:.4f}, Val Accuracy: {val_accuracy:.4f}")
 
-        if val_f1 > best_val_f1: # For Stage 1, we are maximizing F1
+        if val_f1 > best_val_f1:
             best_val_f1 = val_f1
-            epochs_no_improve = 0 # Reset counter
-            best_model_state = model.state_dict() # Save the current model weights
+            epochs_no_improve = 0
+            best_model_state = model.state_dict()
         else:
             epochs_no_improve += 1
             if epochs_no_improve >= patience:
                 print(f"Early stopping triggered after epoch {epoch+1} (No improvement in val F1 for {patience} epochs).")
-                model.load_state_dict(best_model_state) # Load the best model weights
-                break # Stop training
+                model.load_state_dict(best_model_state)
+                break
 
-    return model # Return the model (which might have loaded best weights)
+    return model
 
 
 def evaluate_stage1(model, data_loader, output_csv=f'{model_embeddings}_stage1_test_predictions.csv'):
@@ -180,24 +180,24 @@ def evaluate_stage1(model, data_loader, output_csv=f'{model_embeddings}_stage1_t
             all_labels.extend(labels.cpu().numpy())
 
     val_auc = roc_auc_score(all_labels, all_preds)
-    binary_preds = (np.array(all_preds) > 0.5).astype(int) # Convert probabilities to binary predictions
+    binary_preds = (np.array(all_preds) > 0.5).astype(int)
     val_f1 = f1_score(all_labels, binary_preds)
-    val_accuracy = accuracy_score(all_labels, binary_preds) # Calculate accuracy
+    val_accuracy = accuracy_score(all_labels, binary_preds)
 
     if output_csv:
-        predictions_df = pd.DataFrame({'predicted': all_preds, 'truth': all_labels, 'binary_predicted': binary_preds}) # Add binary predictions to CSV
+        predictions_df = pd.DataFrame({'predicted': all_preds, 'truth': all_labels, 'binary_predicted': binary_preds})
         predictions_df.to_csv(output_csv, index=False)
         print(f"Stage 1 predictions saved to {output_csv}")
 
-    return val_loss/len(data_loader), val_f1, val_auc, val_accuracy # Return accuracy
+    return val_loss/len(data_loader), val_f1, val_auc, val_accuracy
 
-def train_stage2(model, train_loader, val_loader, epochs=10, learning_rate=0.001, weight_decay=1e-5, dropout_rate=0.5, patience=5): # Added patience
+def train_stage2(model, train_loader, val_loader, epochs=10, learning_rate=0.001, weight_decay=1e-5, dropout_rate=0.5, patience=5):
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
-    best_val_rmse = np.inf # Initialize best val metric to infinity for RMSE (lower is better)
+    best_val_rmse = np.inf
     epochs_no_improve = 0
-    best_model_state = None # To store the best model weights
+    best_model_state = None
 
 
     for epoch in range(epochs):
@@ -214,17 +214,17 @@ def train_stage2(model, train_loader, val_loader, epochs=10, learning_rate=0.001
         val_loss, val_rmse = evaluate_stage2(model, val_loader, output_csv=None)
         print(f"Epoch {epoch+1}/{epochs}, Train Loss: {train_loss/len(train_loader):.4f}, Val Loss: {val_loss:.4f}, Val RMSE: {val_rmse:.4f}")
 
-        if val_rmse < best_val_rmse: # For Stage 2, we are minimizing RMSE
+        if val_rmse < best_val_rmse:
             best_val_rmse = val_rmse
-            epochs_no_improve = 0 # Reset counter
-            best_model_state = model.state_dict() # Save current model weights
+            epochs_no_improve = 0
+            best_model_state = model.state_dict()
         else:
             epochs_no_improve += 1
             if epochs_no_improve >= patience:
                 print(f"Early stopping triggered after epoch {epoch+1} (No improvement in val RMSE for {patience} epochs).")
-                model.load_state_dict(best_model_state) # Load best model weights
-                break # Stop training
-    return model # Return the model (which might have loaded best weights)
+                model.load_state_dict(best_model_state)
+                break
+    return model
 
 
 def evaluate_stage2(model, data_loader, output_csv=f'{model_embeddings}_stage2_test_predictions.csv'):
@@ -286,43 +286,40 @@ def evaluate_overall_performance(stage1_model, stage2_model, overall_test_loader
 
 # --- 4. Main Training and Evaluation with Hyperparameter Tuning ---
 
-def objective_stage1(trial, train_loader, val_loader, class_weights_tensor): # Objective function for Optuna - Stage 1
-    # Hyperparameter suggestions from Optuna trial
-    lr = trial.suggest_float('lr_stage1', 1e-5, 1e-3, log=True) # Learning rate
-    weight_decay = trial.suggest_float('weight_decay_stage1', 1e-6, 1e-4, log=True) # Weight decay
-    dropout_rate = trial.suggest_float('dropout_rate_stage1', 0.2, 0.6) # Dropout rate
-    hidden_size = trial.suggest_int('hidden_size_stage1', 64, 256) # Hidden size
-    patience_stage1 = trial.suggest_int('patience_stage1', 2, 5) # Patience for early stopping
+def objective_stage1(trial, train_loader, val_loader, class_weights_tensor):
+    lr = trial.suggest_float('lr_stage1', 1e-5, 1e-3, log=True)
+    weight_decay = trial.suggest_float('weight_decay_stage1', 1e-6, 1e-4, log=True)
+    dropout_rate = trial.suggest_float('dropout_rate_stage1', 0.2, 0.6)
+    hidden_size = trial.suggest_int('hidden_size_stage1', 64, 256)
+    patience_stage1 = trial.suggest_int('patience_stage1', 2, 5)
 
     # Instantiate Stage 1 model with suggested hyperparameters
     input_size = embedding_dim * 2
     model = Stage1Classifier(input_size, hidden_size=hidden_size, dropout_rate=dropout_rate)
 
     # Train Stage 1 model
-    trained_model = train_stage1(model, train_loader, val_loader, epochs=10, learning_rate=lr, class_weights=class_weights_tensor, weight_decay=weight_decay, dropout_rate=dropout_rate, patience=patience_stage1) # Pass patience
-    # use trained_model instead of model for evaluation, to ensure we are using the model with early stopping applied
-    val_loss, val_f1, val_auc, val_accuracy = evaluate_stage1(trained_model, val_loader) # Get accuracy
+    trained_model = train_stage1(model, train_loader, val_loader, epochs=10, learning_rate=lr, class_weights=class_weights_tensor, weight_decay=weight_decay, dropout_rate=dropout_rate, patience=patience_stage1)
+    val_loss, val_f1, val_auc, val_accuracy = evaluate_stage1(trained_model, val_loader)
 
-    return val_f1 # Optimize for Validation F1 score
+    return val_f1
 
-def objective_stage2(trial, train_loader, val_loader): # Objective function for Optuna - Stage 2
+def objective_stage2(trial, train_loader, val_loader):
     # Hyperparameter suggestions for Stage 2
-    lr_stage2 = trial.suggest_float('lr_stage2', 1e-4, 1e-2, log=True) # Learning rate for Stage 2 (different range)
-    weight_decay_stage2 = trial.suggest_float('weight_decay_stage2', 1e-5, 1e-3, log=True) # Weight decay for Stage 2 (different range)
-    dropout_rate_stage2 = trial.suggest_float('dropout_rate_stage2', 0.1, 0.5) # Dropout rate for Stage 2 (different range)
-    hidden_size_stage2 = trial.suggest_int('hidden_size_stage2', 32, 128) # Hidden size for Stage 2 (different range)
-    patience_stage2 = trial.suggest_int('patience_stage2', 3, 7) # Patience for early stopping for Stage 2
+    lr_stage2 = trial.suggest_float('lr_stage2', 1e-4, 1e-2, log=True)
+    weight_decay_stage2 = trial.suggest_float('weight_decay_stage2', 1e-5, 1e-3, log=True)
+    dropout_rate_stage2 = trial.suggest_float('dropout_rate_stage2', 0.1, 0.5)
+    hidden_size_stage2 = trial.suggest_int('hidden_size_stage2', 32, 128)
+    patience_stage2 = trial.suggest_int('patience_stage2', 3, 7)
 
     # Instantiate Stage 2 model with suggested hyperparameters
     input_size = embedding_dim * 2
     model = Stage2Regressor(input_size, hidden_size=hidden_size_stage2, dropout_rate=dropout_rate_stage2)
 
     # Train Stage 2 model
-    trained_model = train_stage2(model, train_loader, val_loader, epochs=25, learning_rate=lr_stage2, weight_decay=weight_decay_stage2, dropout_rate=dropout_rate_stage2, patience=patience_stage2) # Pass patience
-    # use trained_model for evaluation
+    trained_model = train_stage2(model, train_loader, val_loader, epochs=25, learning_rate=lr_stage2, weight_decay=weight_decay_stage2, dropout_rate=dropout_rate_stage2, patience=patience_stage2)
     val_loss, val_rmse = evaluate_stage2(trained_model, val_loader)
 
-    return val_loss # Optimize for Validation Loss (minimize)
+    return val_loss
 
 
 if __name__ == '__main__':
@@ -331,10 +328,10 @@ if __name__ == '__main__':
     processed_df = prepare_data(background_pkl, hypothesis_pkl, 'gordonramsay_data_processed.csv')
     processed_df = create_labels(processed_df)
 
-    # --- Initial 80-20 Overall Split ---
+    # --- Initial Overall Split ---
     train_val_stage1_df, overall_test_df = train_test_split(processed_df, test_size=test_proportion, random_state=42, stratify=processed_df['is_zero_rcr'])
 
-    # --- Stage 1 Data Split (within 80% train_val_stage1_df) ---
+    # --- Stage 1 Data Split ---
     train_df_stage1, temp_df_stage1 = train_test_split(train_val_stage1_df, test_size=0.3, random_state=42, stratify=train_val_stage1_df['is_zero_rcr'])
     val_df_stage1, test_df_stage1 = train_test_split(temp_df_stage1, test_size=0.5, random_state=42, stratify=temp_df_stage1['is_zero_rcr'])
 
@@ -357,8 +354,8 @@ if __name__ == '__main__':
     print(f"Class Weights Tensor for Stage 1: {class_weights_tensor}")
 
     # --- Hyperparameter Tuning for Stage 1 ---
-    study_stage1 = optuna.create_study(direction='maximize') # Maximize F1 score, changed from 'minimize' to 'maximize'
-    study_stage1.optimize(lambda trial: objective_stage1(trial, train_loader_stage1, val_loader_stage1, class_weights_tensor), n_trials=10) # Run 10 trials
+    study_stage1 = optuna.create_study(direction='maximize') # I've found that maximize actually works better here
+    study_stage1.optimize(lambda trial: objective_stage1(trial, train_loader_stage1, val_loader_stage1, class_weights_tensor), n_trials=10)
 
     print("--- Stage 1 Hyperparameter Tuning Results ---")
     print("  Best Trial:")
@@ -369,19 +366,19 @@ if __name__ == '__main__':
     for key, value in trial_stage1.params.items():
         print(f"      {key}: {value}")
 
-    best_params_stage1 = trial_stage1.params # Get best hyperparameters from tuning
+    best_params_stage1 = trial_stage1.params
 
     # --- Stage 1 Training with Best Hyperparameters ---
     print("\n--- Stage 1 Training with Best Hyperparameters ---")
     input_size = embedding_dim * 2
     best_stage1_model = Stage1Classifier(input_size, hidden_size=best_params_stage1['hidden_size_stage1'], dropout_rate=best_params_stage1['dropout_rate_stage1'])
-    best_stage1_model = train_stage1(best_stage1_model, train_loader_stage1, val_loader_stage1, epochs=10, class_weights=class_weights_tensor, # Train with early stopping
+    best_stage1_model = train_stage1(best_stage1_model, train_loader_stage1, val_loader_stage1, epochs=10, class_weights=class_weights_tensor,
                  learning_rate=best_params_stage1['lr_stage1'], weight_decay=best_params_stage1['weight_decay_stage1'],
-                 dropout_rate=best_params_stage1['dropout_rate_stage1'], patience=best_params_stage1.get('patience_stage1', 3)) # Use best patience or default
+                 dropout_rate=best_params_stage1['dropout_rate_stage1'], patience=best_params_stage1.get('patience_stage1', 3))
 
     print("--- Stage 1 Test Evaluation with Best Hyperparameters ---")
-    test_loss_stage1, test_f1_stage1, test_auc_stage1, test_accuracy_stage1 = evaluate_stage1(best_stage1_model, test_loader_stage1) # Get accuracy from test evaluation
-    print(f"Stage 1 Test Loss: {test_loss_stage1:.4f}, Test F1: {test_f1_stage1:.4f}, Test AUC: {test_auc_stage1:.4f}, Test Accuracy: {test_accuracy_stage1:.4f}") # Print test accuracy
+    test_loss_stage1, test_f1_stage1, test_auc_stage1, test_accuracy_stage1 = evaluate_stage1(best_stage1_model, test_loader_stage1)
+    print(f"Stage 1 Test Loss: {test_loss_stage1:.4f}, Test F1: {test_f1_stage1:.4f}, Test AUC: {test_auc_stage1:.4f}, Test Accuracy: {test_accuracy_stage1:.4f}")
 
 
         # --- Save Stage 1 Model ---
@@ -408,8 +405,8 @@ if __name__ == '__main__':
 
 
     # --- Hyperparameter Tuning for Stage 2 ---
-    study_stage2 = optuna.create_study(direction='minimize') # Minimize RMSE, direction is correct for Stage 2
-    study_stage2.optimize(lambda trial: objective_stage2(trial, train_loader_stage2, val_loader_stage2), n_trials=10) # Run 10 trials for Stage 2
+    study_stage2 = optuna.create_study(direction='minimize')
+    study_stage2.optimize(lambda trial: objective_stage2(trial, train_loader_stage2, val_loader_stage2), n_trials=10)
 
     print("\n--- Stage 2 Hyperparameter Tuning Results ---")
     print("  Best Trial:")
@@ -420,15 +417,15 @@ if __name__ == '__main__':
     for key, value in trial_stage2.params.items():
         print(f"      {key}: {value}")
 
-    best_params_stage2 = trial_stage2.params # Get best hyperparameters for Stage 2
+    best_params_stage2 = trial_stage2.params
 
     # --- Stage 2 Training with Best Hyperparameters ---
     print("\n--- Stage 2 Training with Best Hyperparameters ---")
     input_size = embedding_dim * 2
     best_stage2_model = Stage2Regressor(input_size, hidden_size=best_params_stage2['hidden_size_stage2'], dropout_rate=best_params_stage2['dropout_rate_stage2'])
-    best_stage2_model = train_stage2(best_stage2_model, train_loader_stage2, val_loader_stage2, epochs=25, # Train with early stopping
+    best_stage2_model = train_stage2(best_stage2_model, train_loader_stage2, val_loader_stage2, epochs=25,
                  learning_rate=best_params_stage2['lr_stage2'], weight_decay=best_params_stage2['weight_decay_stage2'],
-                 dropout_rate=best_params_stage2['dropout_rate_stage2'], patience=best_params_stage2.get('patience_stage2', 5)) # Use best patience or default
+                 dropout_rate=best_params_stage2['dropout_rate_stage2'], patience=best_params_stage2.get('patience_stage2', 5))
 
 
     print("--- Stage 2 Test Evaluation with Best Hyperparameters ---")
@@ -447,7 +444,7 @@ if __name__ == '__main__':
     overall_test_loader = DataLoader(overall_test_dataset, batch_size=32, shuffle=False)
 
     print(f"\n--- Overall Two-Stage Model Evaluation on {test_proportion*100}% with {model_embeddings} Test Set ---")
-    overall_rmse = evaluate_overall_performance(best_stage1_model, best_stage2_model, overall_test_loader) # Use best models for both stages
+    overall_rmse = evaluate_overall_performance(best_stage1_model, best_stage2_model, overall_test_loader)
     print(f"Overall Test RMSE: {overall_rmse:.4f}")
 
     print("\n--- Two-Stage Model Training and Evaluation Complete ---")

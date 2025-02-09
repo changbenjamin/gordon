@@ -1,11 +1,13 @@
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader # Only need DataLoader for test set
+from torch.utils.data import DataLoader
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 import pickle
 import time
+
+# Choose your embedding below:
 
 # ### LLAMA EMBEDDINGS
 # embedding_dim = 1024
@@ -29,7 +31,7 @@ model_embeddings = "BioBERT"
 
 
 
-# --- 1. Data Loading and Preprocessing (Reusing from scoring model) ---
+# --- 1. Data Loading and Preprocessing ---
 def load_embeddings(embeddings_file):
     with open(embeddings_file, 'rb') as f:
         embeddings_dict = pickle.load(f)
@@ -61,7 +63,7 @@ def create_labels(df):
     df['is_zero_rcr'] = (df['rcr'] == 0).astype(int)
     return df
 
-# --- 2. Model Definitions (Reusing Stage1Classifier and Stage2Regressor from scoring model) ---
+# --- 2. Model Definitions  ---
 class Stage1Classifier(nn.Module):
     def __init__(self, input_size, hidden_size=239, dropout_rate=0.5):
         super(Stage1Classifier, self).__init__()
@@ -96,16 +98,16 @@ class Stage2Regressor(nn.Module):
 
 # --- 3. Prediction Function using Two-Stage Scoring Model ---
 def predict_rcr_two_stage(stage1_model, stage2_model, hypothesis_embedding, background_embedding):
-    combined_embedding = torch.cat((torch.tensor(background_embedding).float(), torch.tensor(hypothesis_embedding).float()), dim=0).unsqueeze(0) # Prepare input
+    combined_embedding = torch.cat((torch.tensor(background_embedding).float(), torch.tensor(hypothesis_embedding).float()), dim=0).unsqueeze(0)
 
     stage1_output = stage1_model(combined_embedding)
     stage1_prediction_binary = (stage1_output > 0.5).int()
 
-    if stage1_prediction_binary.item() == 0: # Stage 1 predicts zero RCR
+    if stage1_prediction_binary.item() == 0: # if Stage 1 predicts zero RCR
         return 0.0
     else: # Stage 1 predicts non-zero RCR, use Stage 2
         stage2_output = stage2_model(combined_embedding)
-        return stage2_output.item() # Return predicted RCR value
+        return stage2_output.item()
 
 if __name__ == '__main__':
     print(f"Evaluating Scoring Model as Ranking Model with {model_embeddings} Embeddings...")
@@ -119,18 +121,17 @@ if __name__ == '__main__':
 
     train_val_stage1_df, overall_test_df = train_test_split(processed_df, test_size=0.1, random_state=42, stratify=processed_df['is_zero_rcr'])
 
-    # --- Prepare Test Pairs with RCR Difference > 0.5 from overall_test_df ---
     test_ranking_pairs = []
-    rcr_threshold_eval = 1.0 # Threshold for RCR difference in test pairs
+    rcr_threshold_eval = 1.0
 
-    start_time_pairs = time.time() # Start timer for pair creation
+    start_time_pairs = time.time()
     pair_count = 0
-    papers_processed_count = 0 # Initialize a separate counter for papers processed # ADDED
+    papers_processed_count = 0
     total_papers_test = len(overall_test_df)
     print("Starting test pair creation...")
 
     for index_a, paper_a in overall_test_df.iterrows():
-        papers_processed_count += 1 # Increment paper counter here, outside inner loop # ADDED
+        papers_processed_count += 1
 
         for index_b, paper_b in overall_test_df.iterrows():
             if index_a == index_b:
@@ -140,18 +141,18 @@ if __name__ == '__main__':
                 if paper_a['rcr'] > paper_b['rcr']:
                     better_paper = paper_a
                     worse_paper = paper_b
-                    label = 1 # Paper A is better - SWAPPED LABEL TO 1
+                    label = 1 # Paper A is better
                 else:
                     better_paper = paper_b
                     worse_paper = paper_a
-                    label = 0 # Paper B is better - SWAPPED LABEL TO 0
+                    label = 0 # Paper B is better
                 test_ranking_pairs.append({
                     'paper_a': paper_a,
                     'paper_b': paper_b,
                     'ranking_label': label # Actual ranking label based on true RCR
                 })
                 pair_count += 1
-        if papers_processed_count % 10 == 0: # Use papers_processed_count in print statement # MODIFIED
+        if papers_processed_count % 10 == 0:
             elapsed_time = time.time() - start_time_pairs
             print(f"Processed {papers_processed_count+1}/{total_papers_test} papers, {pair_count} pairs created so far... ({elapsed_time:.2f} seconds)")
 
@@ -163,15 +164,15 @@ if __name__ == '__main__':
     print(f"Number of test ranking pairs with RCR difference > {rcr_threshold_eval}: {len(test_ranking_pairs_df)}")
 
     # --- Load Saved Stage 1 and Stage 2 Models ---
-    stage1_model = Stage1Classifier(embedding_dim * 2) # Instantiate models
+    stage1_model = Stage1Classifier(embedding_dim * 2)
     stage2_model = Stage2Regressor(embedding_dim * 2)
 
-    stage1_model_path = f"gordonramsay_stage1_{model_embeddings}.pth" # Use model_embeddings variable
+    stage1_model_path = f"gordonramsay_stage1_{model_embeddings}.pth"
     stage2_model_path = f"gordon_ramsay_stage2_{model_embeddings}.pth"
 
-    stage1_model.load_state_dict(torch.load(stage1_model_path)) # Load weights
+    stage1_model.load_state_dict(torch.load(stage1_model_path))
     stage2_model.load_state_dict(torch.load(stage2_model_path))
-    stage1_model.eval() # Set to evaluation mode
+    stage1_model.eval()
     stage2_model.eval()
 
 
@@ -179,7 +180,7 @@ if __name__ == '__main__':
     correct_predictions = 0
     total_pairs = len(test_ranking_pairs_df)
 
-    with torch.no_grad(): # Disable gradient calculation for inference
+    with torch.no_grad():
         for index, pair_row in test_ranking_pairs_df.iterrows():
             paper_a = pair_row['paper_a']
             paper_b = pair_row['paper_b']
