@@ -103,15 +103,14 @@ def predict_rcr_two_stage(stage1_model, stage2_model, hypothesis_embedding, back
     stage1_output = stage1_model(combined_embedding)
     stage1_prediction_binary = (stage1_output > 0.5).int()
 
-    if stage1_prediction_binary.item() == 0: # if Stage 1 predicts zero RCR
+    if stage1_prediction_binary.item() == 0:
         return 0.0
-    else: # Stage 1 predicts non-zero RCR, use Stage 2
+    else:
         stage2_output = stage2_model(combined_embedding)
         return stage2_output.item()
 
 if __name__ == '__main__':
     print(f"Evaluating Scoring Model as Ranking Model with {model_embeddings} Embeddings...")
-    # --- Load Data and Prepare Test Set ---
     background_pkl = background_pkl
     hypothesis_pkl = hypothesis_pkl
     rcr_file = 'gordonramsay_data_processed.csv'
@@ -149,17 +148,16 @@ if __name__ == '__main__':
                 test_ranking_pairs.append({
                     'paper_a': paper_a,
                     'paper_b': paper_b,
-                    'ranking_label': label # Actual ranking label based on true RCR
+                    'ranking_label': label 
                 })
                 pair_count += 1
         if papers_processed_count % 10 == 0:
             elapsed_time = time.time() - start_time_pairs
             print(f"Processed {papers_processed_count+1}/{total_papers_test} papers, {pair_count} pairs created so far... ({elapsed_time:.2f} seconds)")
 
-    test_ranking_pairs_df = pd.DataFrame(test_ranking_pairs) # DataFrame is created AFTER the loop
-    # --- ENSURE test_ranking_pairs_df IS ALWAYS DEFINED, EVEN IF EMPTY ---
-    if test_ranking_pairs_df.empty: # Check if DataFrame is empty (no pairs created)
-        print("Warning: No test ranking pairs were created with RCR difference >", rcr_threshold_eval) # Add a warning message
+    test_ranking_pairs_df = pd.DataFrame(test_ranking_pairs)
+    if test_ranking_pairs_df.empty:
+        print("Warning: No test ranking pairs were created with RCR difference >", rcr_threshold_eval)
 
     print(f"Number of test ranking pairs with RCR difference > {rcr_threshold_eval}: {len(test_ranking_pairs_df)}")
 
@@ -190,11 +188,10 @@ if __name__ == '__main__':
             predicted_rcr_a = predict_rcr_two_stage(stage1_model, stage2_model, paper_a['hypothesis_embedding'], paper_a['background_embedding'])
             predicted_rcr_b = predict_rcr_two_stage(stage1_model, stage2_model, paper_b['hypothesis_embedding'], paper_b['background_embedding'])
 
-            # Predict ranking based on scoring model predictions
             if predicted_rcr_a > predicted_rcr_b:
-                predicted_ranking_label = 0 # Model predicts Paper A better
+                predicted_ranking_label = 0
             else:
-                predicted_ranking_label = 1 # Model predicts Paper B better
+                predicted_ranking_label = 1
 
             if predicted_ranking_label == true_ranking_label:
                 correct_predictions += 1
